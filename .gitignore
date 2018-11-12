@@ -1,5 +1,7 @@
 # CUSTOM ENTRIES
 
+*.index
+.idea/
 data/
 *.csv
 

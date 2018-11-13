@@ -1,7 +1,7 @@
 import os
 import argparse
 import indexer
-
+import search
 
 def option_index(args):
     """Handles command line option 'index'."""

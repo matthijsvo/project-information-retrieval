@@ -39,6 +39,10 @@ def create_index_from_folder(folder, index_file):
             with open(os.path.join(folder, file), newline='') as db:
                 reader = csv.reader(db)
 
+                # The Reddit database seems to carry a lot of duplicate posts, so we try to skip those
+                post_ids = set()
+                duplicate_counter = 0
+
                 # CSV files have a useless first row...
                 skipfirst = True
                 # ... and a useless first column. Skip both.
@@ -47,6 +51,12 @@ def create_index_from_folder(folder, index_file):
                         skipfirst = False
                         continue
                     doc = Document()
+
+                    if rid in post_ids:
+                        duplicate_counter += 1
+                        continue # skip
+                    else:
+                        post_ids.add(rid)
 
                     # Tokenize, index and store
                     doc.add(TextField("text", text, Field.Store.YES))
@@ -67,10 +77,11 @@ def create_index_from_folder(folder, index_file):
 
                     writer.addDocument(doc)
 
-            print("DONE!")
+            print("DONE!\t(Duplicate posts skipped: {})".format(duplicate_counter))
 
     writer.commit()
     writer.close()
 
     print()
     print("Finished indexing!")
+

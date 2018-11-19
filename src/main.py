@@ -3,6 +3,7 @@ import argparse
 import indexer
 import search
 
+
 def option_index(args):
     """Handles command line option 'index'."""
     print("= MAKE INDEX =")
@@ -24,11 +25,19 @@ def option_search(args):
         raise OSError("No such file!")
     print("Query:\t\t\t'{}'".format(args.query))
 
-    raise NotImplementedError
+    search.search_index(args.indexfile, args.query, top=args.top, default_field=args.defaultfield, display_fields=args.resultfields)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="A small command line utility to search Linan Qiu's reddit-dataset.")
+    parser = argparse.ArgumentParser(description="A small command line utility to search Linan Qiu's reddit-dataset.\n"
+                                                 "This utility consists of two parts: \n"
+                                                 "\t'index', which creates an index from a dataset, and\n"
+                                                 "\t'search', which searches a previously created index using a query.\n"
+                                                 "Be sure to read the included help functions (--help) for all available functionality.",
+                                     epilog="the searchable fields are:\n\t'text', 'id', 'subreddit', 'meta',' time' and 'author'\n\n"
+                                            "the displayable fields (for results) are:\n"
+                                            "\t'text', 'id', 'subreddit', 'meta',' time', 'author', 'ups', 'downs', 'authorlinkkarma', 'authorkarma', 'authorisgold'",
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.set_defaults(func=lambda x: parser.print_help())
 
     subparsers = parser.add_subparsers(help="Use --help on the following sub-commands for more details:")
@@ -41,6 +50,12 @@ if __name__ == '__main__':
     searchparser = subparsers.add_parser("search", help="Run a search query")
     searchparser.add_argument("indexfile", action="store", help="Location of Lucene-generated index file")
     searchparser.add_argument("query", action="store", help="Your search query")
+    searchparser.add_argument("-t", "--top", action="store", type=int, default=10,
+                              help="(optional) Maximum amount of results to display")
+    searchparser.add_argument("-df", "--defaultfield", action="store", default="text",
+                              help="(optional) Default field for query, others can still be searched using one or multiple <field>:\"query\"")
+    searchparser.add_argument("-rf", "--resultfields", nargs="+", action="store", default=["subreddit", "author", "text"],
+                              help="(optional) List of fields to display in search results")
     searchparser.set_defaults(func=option_search)
 
     args = parser.parse_args()

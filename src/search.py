@@ -1,4 +1,3 @@
-
 import os
 import lucene
 from java.io import File
@@ -14,17 +13,43 @@ from org.apache.lucene.analysis.standard import ClassicAnalyzer
 from org.apache.lucene.queryparser.classic import QueryParser
 
 
+def search_index(indexfile, query, top=10, default_field="text", display_fields=["subreddit", "author", "text"]):
+    lucene.initVM()
+
+    lindex = SimpleFSDirectory(Paths.get(indexfile))
+    ireader = DirectoryReader.open(lindex)
+    isearcher = IndexSearcher(ireader)
+
+    analyser = ClassicAnalyzer()
+
+    parser = QueryParser(default_field, analyser)
+    query = parser.parse(query)
+
+    hits = isearcher.search(query, top).scoreDocs
+    for i in range(len(hits)):
+        document = isearcher.doc(hits[i].doc)
+        fieldoutput = " | ".join([str(document.get(field)) for field in display_fields])
+        print("#{})\t".format(i+1) + fieldoutput + "\n")
+    if len(hits) == 0:
+        print("No hits!")
+
+    ireader.close()
+    lindex.close()
+
+
 if __name__ == '__main__':
     lucene.initVM()
-    indexdir = "./lucene.index"
+    indexdir = "/home/keerthana/Downloads/project-information-retrieval-master/src/lucene.index"
 
     lindex = SimpleFSDirectory(Paths.get(indexdir))
     ireader = DirectoryReader.open(lindex)
     isearcher = IndexSearcher(ireader)
 
     analyser = ClassicAnalyzer()
-    parser = QueryParser("text", analyser)
-    query = parser.parse("hubble")
+
+
+    parser = QueryParser(input("Enter your field :"), analyser)
+    query = parser.parse(input("Enter Your SearchQuery : "))
 
     hits = isearcher.search(query, 10).scoreDocs
     print(hits)
@@ -32,6 +57,8 @@ if __name__ == '__main__':
         print(i, hits[i])
         hitDoc = isearcher.doc(hits[i].doc)
         print("{} || {} || {}".format(hitDoc.get("subreddit"), hitDoc.get("id"), hitDoc.get("text")))
+    if len(hits) == 0:
+        print("No hits!")
 
     ireader.close()
     lindex.close()

@@ -9,7 +9,7 @@ from org.apache.lucene.index import IndexReader
 from org.apache.lucene.index import DirectoryReader
 from org.apache.lucene.search import IndexSearcher
 from org.apache.lucene.search import Query
-from org.apache.lucene.analysis.standard import ClassicAnalyzer
+from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.queryparser.classic import QueryParser
 
 
@@ -20,7 +20,7 @@ def search_index(indexfile, query, top=10, default_field="text", display_fields=
     ireader = DirectoryReader.open(lindex)
     isearcher = IndexSearcher(ireader)
 
-    analyser = ClassicAnalyzer()
+    analyser = StandardAnalyzer()
 
     parser = QueryParser(default_field, analyser)
     query = parser.parse(query)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     ireader = DirectoryReader.open(lindex)
     isearcher = IndexSearcher(ireader)
 
-    analyser = ClassicAnalyzer()
+    analyser = StandardAnalyzer()
 
 
     parser = QueryParser(input("Enter your field :"), analyser)

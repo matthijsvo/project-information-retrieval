@@ -12,8 +12,10 @@ from org.apache.lucene.search import Query
 from org.apache.lucene.analysis.standard import StandardAnalyzer
 from org.apache.lucene.queryparser.classic import QueryParser
 
+import queryexpansion
 
-def search_index(indexfile, query, top=10, default_field="text", display_fields=["subreddit", "author", "text"]):
+
+def search_index(indexfile, querytext, top=10, default_field="text", display_fields=["subreddit", "author", "text"]):
     lucene.initVM()
 
     lindex = SimpleFSDirectory(Paths.get(indexfile))
@@ -23,11 +25,15 @@ def search_index(indexfile, query, top=10, default_field="text", display_fields=
     analyser = StandardAnalyzer()
 
     parser = QueryParser(default_field, analyser)
-    query = parser.parse(query)
+    query = parser.parse(querytext)
 
     hits = isearcher.search(query, top).scoreDocs
     for i in range(len(hits)):
         document = isearcher.doc(hits[i].doc)
+
+        # print(isearcher.doc(hits[i].doc).get('text'))
+        # queryexpansion.tfidf_score(ireader, hits[i].doc, querytext)
+
         fieldoutput = " | ".join([str(document.get(field)) for field in display_fields])
         print("#{})\t".format(i+1) + fieldoutput + "\n")
     if len(hits) == 0:

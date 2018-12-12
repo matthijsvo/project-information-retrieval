@@ -2,7 +2,7 @@ import os
 import csv
 import lucene
 from java.io import File
-from org.apache.lucene.index import IndexWriterConfig, IndexWriter, FieldInfo
+from org.apache.lucene.index import IndexWriterConfig, IndexWriter, FieldInfo, IndexOptions
 from org.apache.lucene.document import Document, Field, FieldType, TextField, StringField, StoredField
 from org.apache.lucene.store import SimpleFSDirectory
 from org.apache.lucene.util import Version
@@ -43,6 +43,15 @@ def create_index_from_folder(folder, index_file):
                 post_ids = set()
                 duplicate_counter = 0
 
+
+                # To store term vectors (used for query expansion) we have to use a custom fieldtype
+                customfield = FieldType()
+                customfield.setIndexOptions(IndexOptions.DOCS_AND_FREQS)
+                customfield.setStored(True)
+                customfield.setTokenized(True)
+                customfield.setStoreTermVectors(True)
+
+
                 # CSV files have a useless first row...
                 skipfirst = True
                 # ... and a useless first column. Skip both.
@@ -59,7 +68,7 @@ def create_index_from_folder(folder, index_file):
                         post_ids.add(rid)
 
                     # Tokenize, index and store
-                    doc.add(TextField("text", text, Field.Store.YES))
+                    doc.add(Field("text", text, customfield))
 
                     # Index and store
                     doc.add(StringField("id", rid, Field.Store.YES))

@@ -4,7 +4,7 @@ import lucene
 from java.io import File
 from org.apache.lucene.index import IndexWriterConfig, IndexWriter, FieldInfo, IndexOptions
 from org.apache.lucene.document import Document, Field, FieldType, TextField, StringField, StoredField
-from org.apache.lucene.store import SimpleFSDirectory
+from org.apache.lucene.store import SimpleFSDirectory, RAMDirectory
 from org.apache.lucene.util import Version
 from org.apache.lucene.analysis.standard import StandardAnalyzer
 
@@ -43,14 +43,12 @@ def create_index_from_folder(folder, index_file):
                 post_ids = set()
                 duplicate_counter = 0
 
-
                 # To store term vectors (used for query expansion) we have to use a custom fieldtype
                 customfield = FieldType()
                 customfield.setIndexOptions(IndexOptions.DOCS_AND_FREQS)
                 customfield.setStored(True)
                 customfield.setTokenized(True)
                 customfield.setStoreTermVectors(True)
-
 
                 # CSV files have a useless first row...
                 skipfirst = True
@@ -93,4 +91,33 @@ def create_index_from_folder(folder, index_file):
 
     print()
     print("Finished indexing!")
+
+
+def create_miniindex(docs):
+    index_store = RAMDirectory()
+    analyzer = StandardAnalyzer()
+    config = IndexWriterConfig(analyzer)
+    config.setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+    writer = IndexWriter(index_store, config)
+
+    for doc in docs:
+        writer.addDocument(doc)
+
+    writer.commit()
+    writer.close()
+    return index_store
+
+
+def create_minidoc(termstring, field='text'):
+    # To store term vectors (used for query expansion) we have to use a custom fieldtype
+    customfield = FieldType()
+    customfield.setIndexOptions(IndexOptions.DOCS_AND_FREQS)
+    customfield.setStored(True)
+    customfield.setTokenized(True)
+    customfield.setStoreTermVectors(True)
+
+    doc = Document()
+    doc.add(Field(field, termstring, customfield))
+    return doc
+
 

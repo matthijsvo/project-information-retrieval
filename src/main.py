@@ -21,11 +21,17 @@ def option_search(args):
     print("= SEARCH =")
     print()
     print("Index file:\t\t{}".format(args.indexfile))
+    print("QE enabled:\t\t{}".format(args.queryexpansion))
     if not os.path.exists(args.indexfile):
         raise OSError("No such file!")
     print("Query:\t\t\t'{}'".format(args.query))
+    print("\n")
 
-    search.search_index(args.indexfile, args.query, top=args.top, default_field=args.defaultfield, display_fields=args.resultfields)
+    search.search_index(args.indexfile, args.query,
+                        top=args.top,
+                        default_field=args.defaultfield,
+                        display_fields=args.resultfields,
+                        qe=args.queryexpansion)
 
 
 if __name__ == '__main__':
@@ -56,6 +62,7 @@ if __name__ == '__main__':
                               help="(optional) Default field for query, others can still be searched using one or multiple <field>:\"query\"")
     searchparser.add_argument("-rf", "--resultfields", nargs="+", action="store", default=["subreddit", "author", "text"],
                               help="(optional) List of fields to display in search results")
+    searchparser.add_argument("-qe", "--queryexpansion", type=bool, default=False, help="(optional) Enable query expansion (True or False)")
     searchparser.set_defaults(func=option_search)
 
     args = parser.parse_args()

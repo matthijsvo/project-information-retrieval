@@ -15,7 +15,7 @@ from org.apache.lucene.queryparser.classic import QueryParser
 import queryexpansion
 
 
-def search_index(indexfile, querytext, top=10, default_field="text", display_fields=["subreddit", "author", "text"]):
+def search_index(indexfile, querytext, top=10, qe=False, default_field="text", display_fields=["subreddit", "author", "text"]):
     lucene.initVM()
 
     lindex = SimpleFSDirectory(Paths.get(indexfile))
@@ -28,19 +28,33 @@ def search_index(indexfile, querytext, top=10, default_field="text", display_fie
     query = parser.parse(querytext)
 
     hits = isearcher.search(query, top).scoreDocs
-    for i in range(len(hits)):
-        document = isearcher.doc(hits[i].doc)
-
-        # print(isearcher.doc(hits[i].doc).get('text'))
-        # queryexpansion.tfidf_score(ireader, hits[i].doc, querytext)
-
-        fieldoutput = " | ".join([str(document.get(field)) for field in display_fields])
-        print("#{})\t".format(i+1) + fieldoutput + "\n")
+    docIDs = [hit.doc for hit in hits]
+    print_results(isearcher, hits, display_fields)
     if len(hits) == 0:
         print("No hits!")
+    elif qe:
+        print("\n")
+        print("Which documents were relevant to your search need? (Enter spaced list of result numbers [1-{}], e.g. 2 4 5)".format(top))
+        relevantids = [docIDs[i-1] for i in [int(x) for x in input().split()]]
+        nonrelevantids = [id for id in docIDs if id not in relevantids]
+
+        print("\n\n")
+
+        qequerytext = queryexpansion.rocchio(ireader, querytext, relevantids, nonrelevantids)
+        print("Expanded search query: '{}'\n".format(qequerytext))
+        qequery = parser.parse(qequerytext)
+        qehits = isearcher.search(qequery, top).scoreDocs
+        print_results(isearcher, qehits, display_fields)
 
     ireader.close()
     lindex.close()
+
+
+def print_results(isearcher, hits, display_fields):
+    for i in range(len(hits)):
+        document = isearcher.doc(hits[i].doc)
+        fieldoutput = " | ".join([str(document.get(field)) for field in display_fields])
+        print("#{})\t".format(i+1) + fieldoutput + "\n")
 
 
 if __name__ == '__main__':

@@ -26,11 +26,6 @@ def rocchio(ireader, query, relevantIDs, nonrelevantIDs, maxaddedterms=5, tfidft
 
     Weight defaults were sourced from: https://nlp.stanford.edu/IR-book/html/htmledition/the-rocchio71-algorithm-1.html
     """
-    # Fetch all relevant documents
-    alldocs = []
-    for i in relevantIDs + nonrelevantIDs:
-        alldocs.append(ireader.document(i))
-
     # All score vectors we'll be using
     q0 = {}
     drv = {}
@@ -45,24 +40,17 @@ def rocchio(ireader, query, relevantIDs, nonrelevantIDs, maxaddedterms=5, tfidft
         tokens.append(stream.getAttribute(CharTermAttribute.class_).toString())
 
     # (Re)generate score vector for current query
-    q_index = indexer.create_miniindex(alldocs)
-    q0 = get_score_vector(q_index, alpha, terms=tokens)
+    q0 = get_score_vector(ireader, alpha, terms=tokens)
 
     # Generate score vector for relevant documents
     if relevantIDs:
-        dr = alldocs[:len(relevantIDs)]
-        dr_index = indexer.create_miniindex(dr)
-        drv = get_score_vector(dr_index, beta)
-        dr_index.close()
+        drv = get_score_vector(ireader, beta, docs=relevantIDs)
 
     # Generate score vector for nonrelevant documents
     if nonrelevantIDs:
-        dnr = alldocs[-len(nonrelevantIDs):]
-        dnr_index = indexer.create_miniindex(dnr)
-        dnrv = get_score_vector(dnr_index, gamma)
-        dnr_index.close()
+        dnrv = get_score_vector(ireader, gamma, docs=nonrelevantIDs)
 
-    # Merge score vectors
+    # Merge score vectors following Rocchio formula. Weights have already been applied
     q1 = q0
     for key, value in drv.items():
         if key in q1:
@@ -79,7 +67,9 @@ def rocchio(ireader, query, relevantIDs, nonrelevantIDs, maxaddedterms=5, tfidft
     # Terms are narrowed down using both a TF-IDF threshold and a maximum amount of terms
     # The TF-IDF threshold is 0 (i.e. ignored) by default
     bestterms = sorted([t for t in q1.keys() if q1[t] > tfidfthresh], key=lambda x: q1[x], reverse=True)
-    return " ".join(bestterms[:len(tokens)+maxaddedterms])
+    best = bestterms[:len(tokens) + maxaddedterms]
+    # print([(t, q1[t]) for t in best])
+    return " ".join(best)
 
 
 def tfidf_score(ireader, docID, term, field='text'):
@@ -91,18 +81,9 @@ def tfidf_score(ireader, docID, term, field='text'):
     :param term: term string.
     :param field: optional, document field.
     :return: TF-IDF score.
-    Currently unused but included because I wasted far too much time on this.
     """
     # TF
-    termvec = ireader.getTermVector(docID, field)
-    it = termvec.iterator()
-
-    found = it.seekExact(Term(field, term).bytes())
-    if not found:
-        raise Exception("Term '{}' not found in document (ID: {})!".format(term, docID))
-    postings = it.postings(None, PostingsEnum.FREQS)
-    postings.nextDoc()
-    tf = postings.freq()
+    tf = get_doc_frequency(ireader, docID, term, field)
 
     # IDF
     occurences = ireader.docFreq(Term(field, term))
@@ -112,36 +93,83 @@ def tfidf_score(ireader, docID, term, field='text'):
     return tf * idf
 
 
-def get_score_vector(docIndex, weight, terms=[], field='text'):
+def get_doc_frequency(indexReader, docID, term, field='text'):
+    """
+    Returns frequency of term within a single document
+
+    :param indexReader: IndexReader object of your index
+    :param docID: ID of the document
+    :param term: string
+    :param field: document field term is a part of
+    :return:
+    """
+    termvec = indexReader.getTermVector(docID, field)
+    it = termvec.iterator()
+
+    found = it.seekExact(Term(field, term).bytes())
+    if not found:
+        return 0
+    postings = it.postings(None, PostingsEnum.FREQS)
+    postings.nextDoc()
+    return postings.freq()
+
+
+def get_terms(indexReader, field='text'):
+    """
+    Gets all terms in an index.
+
+    :param indexReader: IndexReader object of your index
+    :param field: document field from which terms should be counted
+    :return: list of terms (strings)
+    """
+    terms = []
+    multiterms = MultiFields.getTerms(indexReader, field)
+    termit = multiterms.iterator()
+    it = BytesRefIterator.cast_(termit)  # Inheritance apparently doesn't work in PyLucene...
+    term = it.next()
+    while term:
+        terms.append(term.utf8ToString())
+        term = it.next()
+    return terms
+
+
+def get_score_vector(ireader, weight, docs=None, terms=None, field='text'):
     """
     Creates TF-IDF score vector with a certain weight over either the provided terms, or all terms in the given index.
 
-    :param docIndex: index object with documents.
+    :param ireader: index reader with documents.
     :param weight: weight for scores, results will be multiplied with this number.
+    :param docs: optional list of documents to use for term frequencies exclusively, otherwise calculated over all docs in index
     :param terms: optional list of terms to get a score vector of.
     :param field: optional document field in which terms occur.
     :return: score vector (dict object term -> TF-IDF score).
     """
-    ireader = DirectoryReader.open(docIndex)
     scorevector = {}
 
-    # If terms aren't supplied, gather all from index
     if not terms:
-        multiterms = MultiFields.getTerms(ireader, field)
-        termit = multiterms.iterator()
-        it = BytesRefIterator.cast_(termit) # Inheritance apparently doesn't work in PyLucene...
-        term = it.next()
-        while term:
-            terms.append(term.utf8ToString())
-            term = it.next()
+        # If terms nor specific documents aren't supplied, gather all from index
+        if not docs:
+            terms = get_terms(ireader, field)
+        # If documents are specified, gather all terms in those
+        else:
+            # This is a very cheat-y way of doing this but it works and is less complicated than using TermEnum iterators
+            tempindex = indexer.create_miniindex([ireader.document(i) for i in docs])
+            tempreader = DirectoryReader.open(tempindex)
+            terms = get_terms(tempreader, field)
+            tempreader.close()
 
-    # Calculate TF-IDF for every word
+    # Calculate TF-IDF for every term
     totaldocs = ireader.numDocs()
     for term in terms:
-        tf = math.sqrt(ireader.totalTermFreq(Term(field, term)))
+        tf = 0
+        if not docs:
+            # If no specific docs are specified, look over all
+            tf = math.sqrt(ireader.totalTermFreq(Term(field, term)))
+        else:
+            tf = math.sqrt(sum([get_doc_frequency(ireader, doc, term) for doc in docs]))
+
         occurences = ireader.docFreq(Term(field, term))
-        idf = math.log(totaldocs / (occurences + 1)) + 1
+        idf = math.log((totaldocs + 1.0) / (occurences + 1.0)) + 1.0
         scorevector[term] = weight * tf * idf
 
-    ireader.close()
     return scorevector

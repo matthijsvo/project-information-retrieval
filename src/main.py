@@ -62,7 +62,7 @@ if __name__ == '__main__':
                               help="(optional) Default field for query, others can still be searched using one or multiple <field>:\"query\"")
     searchparser.add_argument("-rf", "--resultfields", nargs="+", action="store", default=["subreddit", "author", "text"],
                               help="(optional) List of fields to display in search results")
-    searchparser.add_argument("-qe", "--queryexpansion", type=bool, default=False, help="(optional) Enable query expansion (True or False)")
+    searchparser.add_argument("-qe", "--queryexpansion", action='store_true', help="(optional) Enable query expansion")
     searchparser.set_defaults(func=option_search)
 
     args = parser.parse_args()
